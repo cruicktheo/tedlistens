@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0a0f">
+
+  <title>Contact - Theodore Cruickshank</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%2300cec9'/></svg>">
+  <meta name="description" content="Get in touch with Theodore Cruickshank.">
+  <meta property="og:title" content="Contact - tedlistens">
+  <meta property="og:site_name" content="tedlistens">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="particle-canvas"></canvas>
+  <div class="cursor-glow"></div>
+  <div class="cursor-dot"></div>
+
+  <header>
+    <nav>
+      <a href="/" class="logo">Theodore Cruickshank</a>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/contact.html" class="active">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="page">
+    <div class="glow-orb glow-orb-1"></div>
+    <div class="glow-orb glow-orb-2"></div>
+    <div class="glow-orb glow-orb-3"></div>
+    <h1>Let's <span class="gradient-text">talk.</span></h1>
+    <p class="page-intro">Whether it's about immersive tech, a project idea, or just a chat &mdash; I'm always up for a good conversation. If you know the code, the particles will listen too.</p>
+
+    <div class="contact-grid stagger-in fade-in">
+
+      <a href="mailto:ted@tedlistens.com" class="contact-card">
+        <div class="contact-icon">&#9993;</div>
+        <h3>Email</h3>
+        <p>The reliable classic. Drop me a line and I'll get back to you.</p>
+        <span class="contact-link">ted@tedlistens.com &rarr;</span>
+      </a>
+
+      <a href="https://uk.linkedin.com/in/theodore-cruickshank-b944865b" target="_blank" rel="noopener" class="contact-card">
+        <div class="contact-icon">&#128101;</div>
+        <h3>LinkedIn</h3>
+        <p>Connect with me professionally. See where I've been and what I'm up to.</p>
+        <span class="contact-link">View profile &rarr;</span>
+      </a>
+
+      <a href="https://www.fun-and-awe.io" target="_blank" rel="noopener" class="contact-card">
+        <div class="contact-icon">&#10024;</div>
+        <h3>Fun and Awe</h3>
+        <p>Check out what my current studio is building in spatial computing.</p>
+        <span class="contact-link">fun-and-awe.io &rarr;</span>
+      </a>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; tedlistens. Built by Theodore Cruickshank. <a href="/contact.html">Say hello</a>.</p>
+  </footer>
+
+  <script>
+    // === Particle constellation ===
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let mouse = { x: -1000, y: -1000 };
+    const PARTICLE_COUNT = 60;
+    const MOUSE_RADIUS = 200;
+    let frameCount = 0;
+
+    const ENVIRONMENTS = [
+      {
+        name: 'aurora',
+        particleColor: { r: 72, g: 219, b: 170 },
+        connectColor: { r: 46, g: 204, b: 164 },
+        mouseColor: { r: 129, g: 236, b: 195 },
+        speed: 0.3, connectDist: 180, connectAlpha: 0.12, mouseAlpha: 0.28,
+        mouseForce: 0.015, damping: 0.985,
+        drift: { dx: 0, dy: 0 },
+        sway: { amplitude: 0.3, frequency: 0.008 },
+        alphaRange: [0.15, 0.55], radiusRange: [0.5, 2.5],
+        bgGradient: 'radial-gradient(ellipse at 50% 0%, rgba(20, 60, 40, 0.18) 0%, rgba(8, 30, 22, 0.08) 40%, #0a0a0f 100%)'
+      },
+      {
+        name: 'deepSpace',
+        particleColor: { r: 108, g: 92, b: 231 },
+        connectColor: { r: 0, g: 206, b: 201 },
+        mouseColor: { r: 253, g: 121, b: 168 },
+        speed: 0.4, connectDist: 150, connectAlpha: 0.15, mouseAlpha: 0.3,
+        mouseForce: 0.02, damping: 0.99,
+        drift: null, sway: null,
+        alphaRange: [0.15, 0.55], radiusRange: [0.5, 2.5],
+        bgGradient: 'radial-gradient(ellipse at 30% 20%, rgba(30, 20, 60, 0.2) 0%, rgba(15, 10, 35, 0.09) 45%, #0a0a0f 100%)'
+      },
+      {
+        name: 'ember',
+        particleColor: { r: 245, g: 130, b: 48 },
+        connectColor: { r: 230, g: 80, b: 40 },
+        mouseColor: { r: 255, g: 200, b: 60 },
+        speed: 0.4, connectDist: 100, connectAlpha: 0.12, mouseAlpha: 0.3,
+        mouseForce: 0.01, damping: 0.992,
+        drift: { dx: 0, dy: -0.15 },
+        sway: { amplitude: 0.15, frequency: 0.012 },
+        alphaRange: [0.15, 0.6], radiusRange: [0.3, 2.0],
+        bgGradient: 'radial-gradient(ellipse at 50% 100%, rgba(60, 20, 5, 0.2) 0%, rgba(35, 12, 3, 0.09) 40%, #0a0a0f 100%)'
+      },
+      {
+        name: 'ocean',
+        particleColor: { r: 52, g: 152, b: 219 },
+        connectColor: { r: 41, g: 128, b: 185 },
+        mouseColor: { r: 116, g: 198, b: 241 },
+        speed: 0.35, connectDist: 140, connectAlpha: 0.13, mouseAlpha: 0.28,
+        mouseForce: 0.018, damping: 0.988,
+        drift: { dx: 0.05, dy: 0 },
+        sway: { amplitude: 0.4, frequency: 0.005 },
+        alphaRange: [0.15, 0.55], radiusRange: [0.5, 2.2],
+        bgGradient: 'radial-gradient(ellipse at 50% 80%, rgba(8, 40, 70, 0.2) 0%, rgba(5, 22, 42, 0.09) 45%, #0a0a0f 100%)'
+      },
+      {
+        name: 'neon',
+        particleColor: { r: 255, g: 41, b: 117 },
+        connectColor: { r: 0, g: 199, b: 255 },
+        mouseColor: { r: 255, g: 69, b: 211 },
+        speed: 0.7, connectDist: 110, connectAlpha: 0.2, mouseAlpha: 0.4,
+        mouseForce: 0.035, damping: 0.985,
+        drift: null, sway: null,
+        alphaRange: [0.15, 0.65], radiusRange: [0.3, 2.0],
+        bgGradient: 'radial-gradient(ellipse at 70% 30%, rgba(50, 5, 30, 0.18) 0%, rgba(5, 15, 40, 0.08) 50%, #0a0a0f 100%)'
+      },
+      {
+        name: 'fireflies',
+        particleColor: { r: 220, g: 210, b: 80 },
+        connectColor: { r: 160, g: 200, b: 60 },
+        mouseColor: { r: 240, g: 230, b: 120 },
+        speed: 0.25, connectDist: 90, connectAlpha: 0.12, mouseAlpha: 0.25,
+        mouseForce: 0.01, damping: 0.993,
+        drift: { dx: 0, dy: -0.03 },
+        sway: { amplitude: 0.2, frequency: 0.01 },
+        alphaRange: [0.15, 0.7], radiusRange: [0.5, 3.0],
+        bgGradient: 'radial-gradient(ellipse at 40% 60%, rgba(20, 30, 10, 0.18) 0%, rgba(10, 18, 5, 0.08) 45%, #0a0a0f 100%)'
+      },
+      {
+        name: 'frost',
+        particleColor: { r: 200, g: 220, b: 240 },
+        connectColor: { r: 170, g: 200, b: 230 },
+        mouseColor: { r: 220, g: 235, b: 255 },
+        speed: 0.2, connectDist: 190, connectAlpha: 0.12, mouseAlpha: 0.25,
+        mouseForce: 0.012, damping: 0.988,
+        drift: { dx: 0.02, dy: -0.02 },
+        sway: { amplitude: 0.1, frequency: 0.006 },
+        alphaRange: [0.15, 0.55], radiusRange: [0.5, 2.8],
+        bgGradient: 'radial-gradient(ellipse at 50% 30%, rgba(25, 35, 50, 0.18) 0%, rgba(15, 20, 30, 0.08) 45%, #0a0a0f 100%)'
+      },
+      {
+        name: 'void',
+        particleColor: { r: 140, g: 80, b: 200 },
+        connectColor: { r: 100, g: 60, b: 160 },
+        mouseColor: { r: 200, g: 130, b: 255 },
+        speed: 0.2, connectDist: 120, connectAlpha: 0.16, mouseAlpha: 0.3,
+        mouseForce: 0.01, damping: 0.995,
+        drift: { dx: 0, dy: 0.02 },
+        sway: { amplitude: 0.15, frequency: 0.004 },
+        alphaRange: [0.25, 0.6], radiusRange: [0.5, 2.5],
+        bgGradient: 'radial-gradient(ellipse at 50% 50%, rgba(18, 8, 30, 0.2) 0%, rgba(10, 5, 18, 0.09) 40%, #0a0a0f 100%)'
+      }
+    ];
+    const env = ENVIRONMENTS[Math.floor(Math.random() * ENVIRONMENTS.length)];
+    document.body.style.background = env.bgGradient;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.vx = (Math.random() - 0.5) * env.speed;
+        this.vy = (Math.random() - 0.5) * env.speed;
+        this.radius = Math.random() * (env.radiusRange[1] - env.radiusRange[0]) + env.radiusRange[0];
+        this.baseAlpha = Math.random() * (env.alphaRange[1] - env.alphaRange[0]) + env.alphaRange[0];
+        this.phase = Math.random() * Math.PI * 2;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (env.drift) {
+          this.x += env.drift.dx;
+          this.y += env.drift.dy;
+        }
+        if (env.sway) {
+          this.x += Math.sin(frameCount * env.sway.frequency + this.phase) * env.sway.amplitude;
+        }
+
+        if (this.x < -10) this.x = canvas.width + 10;
+        else if (this.x > canvas.width + 10) this.x = -10;
+        if (this.y < -10) this.y = canvas.height + 10;
+        else if (this.y > canvas.height + 10) this.y = -10;
+
+        if (!env.drift && !env.sway) {
+          if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+          if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        }
+
+        const dx = mouse.x - this.x;
+        const dy = mouse.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MOUSE_RADIUS) {
+          const force = (MOUSE_RADIUS - dist) / MOUSE_RADIUS * env.mouseForce;
+          this.vx += dx * force;
+          this.vy += dy * force;
+        }
+        this.vx *= env.damping;
+        this.vy *= env.damping;
+      }
+      draw() {
+        let alpha = this.baseAlpha;
+        if (env.name === 'fireflies') {
+          alpha *= 0.5 + 0.5 * Math.sin(frameCount * 0.03 + this.phase);
+        }
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${env.particleColor.r}, ${env.particleColor.g}, ${env.particleColor.b}, ${alpha})`;
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+    function animateParticles() {
+      frameCount++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => { p.update(); p.draw(); });
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < env.connectDist) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(${env.connectColor.r}, ${env.connectColor.g}, ${env.connectColor.b}, ${(1 - dist / env.connectDist) * env.connectAlpha})`;
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+          }
+        }
+      }
+      particles.forEach(p => {
+        const dx = mouse.x - p.x;
+        const dy = mouse.y - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MOUSE_RADIUS) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(mouse.x, mouse.y);
+          ctx.strokeStyle = `rgba(${env.mouseColor.r}, ${env.mouseColor.g}, ${env.mouseColor.b}, ${(1 - dist / MOUSE_RADIUS) * env.mouseAlpha})`;
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        }
+      });
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    // === Custom cursor ===
+    const cursorGlow = document.querySelector('.cursor-glow');
+    const cursorDot = document.querySelector('.cursor-dot');
+    document.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      cursorGlow.style.left = e.clientX + 'px';
+      cursorGlow.style.top = e.clientY + 'px';
+      cursorDot.style.left = e.clientX + 'px';
+      cursorDot.style.top = e.clientY + 'px';
+    });
+    document.addEventListener('touchstart', (e) => {
+      const t = e.touches[0]; mouse.x = t.clientX; mouse.y = t.clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      const t = e.touches[0]; mouse.x = t.clientX; mouse.y = t.clientY;
+    }, { passive: true });
+    document.addEventListener('touchend', () => {
+      mouse.x = -1000; mouse.y = -1000;
+    }, { passive: true });
+    document.querySelectorAll('a, button, .btn, .contact-card').forEach(el => {
+      el.addEventListener('mouseenter', () => cursorDot.classList.add('hovering'));
+      el.addEventListener('mouseleave', () => cursorDot.classList.remove('hovering'));
+    });
+
+    // === Scroll observers ===
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in, .stagger-in').forEach(el => observer.observe(el));
+
+    // === Hold-to-shudder-and-fling particles ===
+    let mouseDownAt = 0;
+    let mouseHeld = false;
+    let shuddering = false;
+    const HOLD_THRESHOLD = 2000;
+    const SHUDDER_RADIUS = 200;
+
+    function startHold() {
+      mouseDownAt = Date.now();
+      mouseHeld = true;
+      shuddering = false;
+    }
+    function releaseHold() {
+      if (shuddering) {
+        particles.forEach(p => {
+          const dx = p.x - mouse.x;
+          const dy = p.y - mouse.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < SHUDDER_RADIUS) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 12 + Math.random() * 16;
+            p.vx = Math.cos(angle) * speed;
+            p.vy = Math.sin(angle) * speed;
+          }
+        });
+      }
+      mouseHeld = false;
+      shuddering = false;
+      mouseDownAt = 0;
+    }
+    document.addEventListener('mousedown', startHold);
+    document.addEventListener('mouseup', releaseHold);
+    document.addEventListener('touchstart', startHold, { passive: true });
+    document.addEventListener('touchend', releaseHold, { passive: true });
+    document.addEventListener('touchcancel', releaseHold, { passive: true });
+
+    // Patch into animation — check shudder each frame
+    (function patchShudder() {
+      const origUpdate = Particle.prototype.update;
+      Particle.prototype.update = function() {
+        origUpdate.call(this);
+        if (mouseHeld && mouseDownAt && Date.now() - mouseDownAt >= HOLD_THRESHOLD) {
+          shuddering = true;
+          const dx = this.x - mouse.x;
+          const dy = this.y - mouse.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < SHUDDER_RADIUS) {
+            this.vx += (Math.random() - 0.5) * 2;
+            this.vy += (Math.random() - 0.5) * 2;
+          }
+        }
+      };
+    })();
+
+    // === Card tilt effect ===
+    document.querySelectorAll('.contact-card').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = (y - centerY) / centerY * -8;
+        const rotateY = (x - centerX) / centerX * 8;
+        card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-6px) scale(1.02)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+      });
+    });
+
+    // === Easter egg - Konami code ===
+    const konamiSequence = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    let konamiIndex = 0;
+    document.addEventListener('keydown', (e) => {
+      if (e.key === konamiSequence[konamiIndex]) {
+        konamiIndex++;
+        if (konamiIndex === konamiSequence.length) {
+          konamiIndex = 0;
+          triggerEasterEgg();
+        }
+      } else {
+        konamiIndex = 0;
+      }
+    });
+
+    function triggerEasterEgg() {
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      particles.forEach(p => {
+        p.vx = (cx - p.x) * 0.05;
+        p.vy = (cy - p.y) * 0.05;
+      });
+      setTimeout(() => {
+        particles.forEach(p => {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3 + Math.random() * 5;
+          p.vx = Math.cos(angle) * speed;
+          p.vy = Math.sin(angle) * speed;
+          p.baseAlpha = 0.8;
+        });
+        const msg = document.createElement('div');
+        msg.textContent = '\u2726 you found it \u2726';
+        msg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.5rem;font-family:Inter,sans-serif;opacity:0;transition:opacity 0.4s;z-index:10000;pointer-events:none;text-shadow:0 0 20px rgba(108,92,231,0.8);';
+        document.body.appendChild(msg);
+        requestAnimationFrame(() => msg.style.opacity = '1');
+        setTimeout(() => {
+          msg.style.opacity = '0';
+          setTimeout(() => msg.remove(), 500);
+        }, 1500);
+      }, 600);
+    }
+  </script>
+</body>
+</html>
