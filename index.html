@@ -658,7 +658,7 @@
       const pgCanvas = document.getElementById('playground-canvas');
       const pgCtx = pgCanvas.getContext('2d');
       const arena = document.getElementById('playground-arena');
-      const PG_COUNT = 200;
+      const PG_COUNT = window.innerWidth <= 768 ? 100 : 200;
       const PG_CONNECT = 100;
       const PG_MOUSE_RADIUS = 250;
 
