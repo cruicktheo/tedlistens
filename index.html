@@ -365,7 +365,19 @@
     }
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      particles.push(new Particle());
+      const p = new Particle();
+      // Bias ~40% of particles to cluster near the portrait area on load
+      if (i < PARTICLE_COUNT * 0.4) {
+        const el = document.querySelector('.hero-portrait');
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          p.x = cx + (Math.random() - 0.5) * 300;
+          p.y = cy + (Math.random() - 0.5) * 300;
+        }
+      }
+      particles.push(p);
     }
 
     function animateParticles() {
