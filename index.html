@@ -541,6 +541,7 @@
     portraitImg.src = 'documents/ted.png';
     let colMap = null, colW = 0, colH = 0;
     let portraitRect = null;
+    let portraitVisible = false;
     const COL_SCALE = 4;
 
     portraitImg.onload = () => {
@@ -560,7 +561,10 @@
 
     function updatePortraitRect() {
       const el = document.querySelector('.hero-portrait');
-      if (el) portraitRect = el.getBoundingClientRect();
+      if (el) {
+        portraitRect = el.getBoundingClientRect();
+        portraitVisible = portraitRect.bottom > 0 && portraitRect.top < window.innerHeight;
+      }
     }
     window.addEventListener('scroll', updatePortraitRect, { passive: true });
     window.addEventListener('resize', updatePortraitRect);
@@ -600,8 +604,23 @@
           }
         }
 
+        // Portrait attraction — pull particles toward center when visible
+        if (portraitRect && portraitVisible) {
+          const pcx = portraitRect.left + portraitRect.width / 2;
+          const pcy = portraitRect.top + portraitRect.height / 2;
+          const ATTRACT_RADIUS = 300;
+          const adx = pcx - this.x;
+          const ady = pcy - this.y;
+          const adist = Math.sqrt(adx * adx + ady * ady);
+          if (adist < ATTRACT_RADIUS && adist > 1) {
+            const strength = (ATTRACT_RADIUS - adist) / ATTRACT_RADIUS * 0.012;
+            this.vx += (adx / adist) * strength;
+            this.vy += (ady / adist) * strength;
+          }
+        }
+
         // Portrait collision
-        if (colMap && portraitRect) {
+        if (colMap && portraitRect && portraitVisible) {
           const relX = (this.x - portraitRect.left) / portraitRect.width;
           const relY = (this.y - portraitRect.top) / portraitRect.height;
           if (relX >= 0 && relX < 1 && relY >= 0 && relY < 1) {
