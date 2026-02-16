@@ -200,6 +200,8 @@
     const PARTICLE_COUNT = 80;
     const MOUSE_RADIUS = 200;
     let frameCount = 0;
+    let portraitRect = null;
+    let portraitVisible = false;
 
     const ENVIRONMENTS = [
       {
@@ -553,8 +555,6 @@
     const portraitImg = new Image();
     portraitImg.src = 'documents/ted.png';
     let colMap = null, colW = 0, colH = 0;
-    let portraitRect = null;
-    let portraitVisible = false;
     const COL_SCALE = 4;
 
     portraitImg.onload = () => {
