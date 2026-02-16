@@ -382,6 +382,7 @@
 
     function animateParticles() {
       frameCount++;
+      updatePortraitRect();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach(p => { p.update(); p.draw(); });
 
@@ -578,8 +579,6 @@
         portraitVisible = portraitRect.bottom > 0 && portraitRect.top < window.innerHeight;
       }
     }
-    window.addEventListener('scroll', updatePortraitRect, { passive: true });
-    window.addEventListener('resize', updatePortraitRect);
 
     // If drag enters portrait mid-scroll, stop scrolling; if started on portrait, allow scroll
     let touchStartedOnPortrait = false;
