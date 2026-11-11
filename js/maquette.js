@@ -8,6 +8,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { createXRGallery } from './xr-gallery.js';
 
 const COLORS = {
   plaster: 0xe3e5e2,
@@ -492,6 +493,7 @@ for (let i = 0; i < 2; i++) {
   controller.add(beam);
   controller.addEventListener('selectstart', onSelectStart);
   controller.addEventListener('selectend', onSelectEnd);
+  controller.addEventListener('squeezestart', () => { if (renderer.xr.isPresenting) placeStage(); });
   scene.add(controller);
   controllers.push(controller);
 
@@ -502,6 +504,7 @@ for (let i = 0; i < 2; i++) {
 
 function onSelectStart(e) {
   const controller = e.target;
+  if (gallery.select(controller)) return;
   raycaster.setFromXRController(controller);
   const hit = raycaster.intersectObjects(blockMeshes, false)[0];
   if (!hit) return;
@@ -523,17 +526,56 @@ function onSelectEnd(e) {
   controller.userData.held = null;
 }
 
+// In a headset, everything hangs off a stage placed where the visitor is standing and facing:
+// the table sits just in front of them, within arm's reach, a little below their eyes.
+const stage = new THREE.Group();
+scene.add(stage);
+const TABLE_DISTANCE = 0.62;   // metres from the eyes to the middle of the table
+const TABLE_BELOW_EYES = 0.5;
+let stagePending = false;
+
+function placeStage() {
+  const headPos = camera.position;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  fwd.y = 0;
+  if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
+  fwd.normalize();
+  const yaw = Math.atan2(-fwd.x, -fwd.z);
+  const tableY = THREE.MathUtils.clamp(headPos.y - TABLE_BELOW_EYES, 0.45, 1.3);
+
+  stage.position.set(headPos.x, 0, headPos.z);
+  stage.rotation.set(0, yaw, 0);
+  model.position.set(0, tableY, -TABLE_DISTANCE);
+  pedestal.position.set(0, tableY / 2, -TABLE_DISTANCE);
+  pedestal.scale.set(1, tableY / 0.8, 1);
+  stage.updateMatrixWorld(true);
+
+  const centre = model.getWorldPosition(new THREE.Vector3());
+  sun.position.set(-6, 11, 7).multiplyScalar(XR_SCALE * 1.5).add(centre);
+  sun.target.position.copy(centre);
+}
+
 function setXRMode(on) {
-  model.position.set(0, on ? 0.8 : 0, on ? -1.2 : 0);
-  model.scale.setScalar(on ? XR_SCALE : 1);
+  if (on) {
+    stage.add(model, pedestal);
+    model.scale.setScalar(XR_SCALE);
+    stagePending = true;   // wait for the first head pose before placing the table
+  } else {
+    scene.add(model, pedestal);
+    stage.position.set(0, 0, 0);
+    stage.rotation.set(0, 0, 0);
+    model.position.set(0, 0, 0);
+    model.scale.setScalar(1);
+    sun.position.set(-6, 11, 7);
+    sun.target.position.set(0, 0, 0);
+  }
   floor.visible = grid.visible = !on;
   board.visible = pedestal.visible = roomFloor.visible = on;
   pedestal.castShadow = on;
   setShadowExtent(on ? XR_SCALE * 1.4 : 1);
-  sun.position.set(-6, 11, 7).multiplyScalar(on ? XR_SCALE : 1).add(model.position);
-  sun.target.position.copy(model.position);
   labelLayer.hidden = on;
   ray.visible = reticle.visible = false;
+  gallery.setVisible(on);
 }
 
 let xrSession = null;
@@ -946,6 +988,10 @@ function updateInk(dt, t, inXR) {
   uploadDye();
 }
 
+// ---------- VR gallery ----------
+
+const gallery = createXRGallery({ renderer, scene, stage, model, camera, blocks, controllers, board });
+
 // ---------- Frame loop ----------
 
 let heroVisible = true;
@@ -984,6 +1030,12 @@ renderer.setAnimationLoop(() => {
   }
 
   updateInk(dt, elapsed, inXR);
+
+  if (inXR) {
+    // The head pose arrives a frame or two into the session; place the table once it has.
+    if (stagePending && camera.position.lengthSq() > 0.01) { placeStage(); stagePending = false; }
+    gallery.update(dt);
+  }
 
   if (!inXR) {
     view.parallax.lerp(view.parallaxGoal, 1 - Math.exp(-dt * 3));
