@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
@@ -62,6 +63,10 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
+// The scene is light, so spend the headroom on sharpness: no foveated rendering (its tiles show as
+// boxy breaks in the ink and soften text) and a framebuffer a little above the recommended size.
+renderer.xr.setFoveation(0);
+renderer.xr.setFramebufferScaleFactor(1.3);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(COLORS.plaster);
@@ -71,7 +76,8 @@ const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 100);
 
 // ---------- Lighting: overcast studio with one soft key ----------
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0xb4b9be, 2.5));
+const hemi = new THREE.HemisphereLight(0xffffff, 0xb4b9be, 2.5);
+scene.add(hemi);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1.9);
 sun.position.set(-6, 11, 7);
@@ -474,14 +480,25 @@ scene.add(pedestal);
 
 const roomFloor = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
-  new THREE.MeshStandardMaterial({ color: 0xd0d3cf, roughness: 1 })
+  new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 1 })
 );
 roomFloor.rotation.x = -Math.PI / 2;
+roomFloor.receiveShadow = true;
 roomFloor.visible = false;
 scene.add(roomFloor);
 
 const controllers = [];
 const controllerFactory = new XRControllerModelFactory();
+const handFactory = new XRHandModelFactory();
+const hands = [];
+
+// Tracked hands, drawn as articulated meshes in the same matte foam as the blocks.
+const handMaterial = new THREE.MeshStandardMaterial({ color: COLORS.foam, roughness: 0.75 });
+function restyleHand(handModel) {
+  let found = false;
+  handModel.traverse(o => { if (o.isMesh) { o.material = handMaterial; o.castShadow = false; found = true; } });
+  return found;
+}
 
 for (let i = 0; i < 2; i++) {
   const controller = renderer.xr.getController(i);
@@ -500,6 +517,21 @@ for (let i = 0; i < 2; i++) {
   const grip = renderer.xr.getControllerGrip(i);
   grip.add(controllerFactory.createControllerModel(grip));
   scene.add(grip);
+
+  // Remember whether this input is a hand, so its beam and ink sphere can follow the fingertip instead.
+  controller.addEventListener('connected', e => { controller.userData.isHand = !!e.data.hand; beam.visible = !e.data.hand; });
+  controller.addEventListener('disconnected', () => { controller.userData.isHand = false; });
+
+  const hand = renderer.xr.getHand(i);
+  const handModel = handFactory.createHandModel(hand, 'mesh');
+  hand.add(handModel);
+  scene.add(hand);
+  hands.push(hand);
+  // The hand mesh loads asynchronously the first time a hand appears; restyle it once it's there.
+  hand.addEventListener('connected', () => {
+    let tries = 0;
+    const wait = setInterval(() => { if (restyleHand(handModel) || ++tries > 50) clearInterval(wait); }, 200);
+  });
 }
 
 function onSelectStart(e) {
@@ -526,10 +558,17 @@ function onSelectEnd(e) {
   controller.userData.held = null;
 }
 
+// In a headset the room is a darkened gallery: the table and boards stand in pools of light.
+const XR_DARK = new THREE.Color(0x16191d);
+const PLASTER = new THREE.Color(COLORS.plaster);
+const tableSpot = new THREE.SpotLight(0xffffff, 4.5, 4, 0.55, 0.65, 2);
+tableSpot.visible = false;
+
 // In a headset, everything hangs off a stage placed where the visitor is standing and facing:
 // the table sits just in front of them, within arm's reach, a little below their eyes.
 const stage = new THREE.Group();
 scene.add(stage);
+stage.add(tableSpot, tableSpot.target);
 const TABLE_DISTANCE = 0.62;   // metres from the eyes to the middle of the table
 const TABLE_BELOW_EYES = 0.5;
 let stagePending = false;
@@ -563,6 +602,8 @@ function placeStage() {
   model.position.set(0, tableY, -TABLE_DISTANCE);
   pedestal.position.set(0, tableY / 2, -TABLE_DISTANCE);
   pedestal.scale.set(1, tableY / 0.8, 1);
+  tableSpot.position.set(0.25, tableY + 1.5, -TABLE_DISTANCE + 0.35);
+  tableSpot.target.position.set(0, tableY, -TABLE_DISTANCE);
   stage.updateMatrixWorld(true);
 
   const centre = model.getWorldPosition(new THREE.Vector3());
@@ -591,6 +632,16 @@ function setXRMode(on) {
   labelLayer.hidden = on;
   ray.visible = reticle.visible = false;
   gallery.setVisible(on);
+  // Dim the room so the table and boards pop.
+  scene.background = on ? XR_DARK : PLASTER;
+  scene.fog.color.copy(on ? XR_DARK : PLASTER);
+  if (on) { scene.fog.near = 2.5; scene.fog.far = 9; }
+  hemi.intensity = on ? 0.35 : 2.5;
+  sun.intensity = on ? 0.9 : 1.9;
+  tableSpot.visible = on;
+  // Seen from arm's length, the wash needs less grain and edge wobble than from across the room.
+  washMat.uniforms.grain.value = on ? 0.3 : 1;
+  washMat.uniforms.warp.value = on ? 0.7 : 2.2;
 }
 
 let xrSession = null;
@@ -605,7 +656,7 @@ vrButton.addEventListener('click', async () => {
   if (xrSession) { xrSession.end(); return; }
   try {
     const session = await navigator.xr.requestSession('immersive-vr', {
-      optionalFeatures: ['local-floor', 'bounded-floor'],
+      optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
     });
     await renderer.xr.setSession(session);
     xrSession = session;
@@ -642,6 +693,7 @@ const INK = {
   vorticity: 2.6,         // keeps small swirls alive against numerical damping
   fade: 0.075,             // how quickly ink fades, per second
   sphereRadius: 0.6,      // the cursor's sphere, in model metres
+  fingerRadius: 0.22,     // a tracked fingertip's sphere (about 3 cm across in a headset)
   waterLevel: 0.15,       // height of the water surface the sphere cuts through
   bands: 7,               // dye inlets along the right-hand edge
 };
@@ -705,7 +757,7 @@ function markSolids(spheres) {
   // smaller when it rests on a block top, gone when it's well above the water.
   for (const m of spheres) {
     const dy = m.y - INK.waterLevel;
-    const slice = INK.sphereRadius * INK.sphereRadius - dy * dy;
+    const slice = m.r * m.r - dy * dy;
     if (slice <= 0) continue;
     const r = Math.sqrt(slice) / CELL;
     const ci = toGX(m.x), cj = toGZ(m.z);
@@ -872,6 +924,9 @@ const washMat = new THREE.ShaderMaterial({
     pigment: { value: new THREE.Color(COLORS.ultramarine) },
     pigmentDeep: { value: new THREE.Color(0x14228f) },
     aspect: { value: GRID_X / GRID_Z },
+    texSize: { value: new THREE.Vector2(DYE_X, DYE_Z) },
+    grain: { value: 1 },
+    warp: { value: 2.2 },
   }]),
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -889,6 +944,9 @@ const washMat = new THREE.ShaderMaterial({
     uniform vec3 pigment;
     uniform vec3 pigmentDeep;
     uniform float aspect;
+    uniform vec2 texSize;
+    uniform float grain;
+    uniform float warp;
     varying vec2 vUv;
     #include <fog_pars_fragment>
 
@@ -899,26 +957,46 @@ const washMat = new THREE.ShaderMaterial({
       return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
     }
 
+    // Smooth (cubic B-spline) lookup from four bilinear taps, so the dye grid never shows up close.
+    vec4 cubicWeights(float v) {
+      vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
+      vec4 s = n * n * n;
+      float x = s.x, y = s.y - 4.0 * s.x, z = s.z - 4.0 * s.y + 6.0 * s.x;
+      return vec4(x, y, z, 6.0 - x - y - z) * (1.0 / 6.0);
+    }
+    float dyeSmooth(vec2 uv) {
+      uv = uv * texSize - 0.5;
+      vec2 f = fract(uv);
+      uv -= f;
+      vec4 xc = cubicWeights(f.x), yc = cubicWeights(f.y);
+      vec4 c = uv.xxyy + vec2(-0.5, 1.5).xyxy;
+      vec4 s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+      vec4 o = (c + vec4(xc.yw, yc.yw) / s) / texSize.xxyy;
+      float s0 = texture2D(dye, o.xz).r, s1 = texture2D(dye, o.yz).r;
+      float s2 = texture2D(dye, o.xw).r, s3 = texture2D(dye, o.yw).r;
+      float sx = s.x / (s.x + s.y), sy = s.z / (s.z + s.w);
+      return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy);
+    }
+
     void main() {
       // The plane's v runs opposite to the simulation's z.
       vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
       vec2 q = uv * vec2(aspect, 1.0);
 
       // Wobble the lookup a touch so edges look bled rather than sampled.
-      vec2 warp = vec2(noise(q * 22.0), noise(q * 22.0 + 7.3)) - 0.5;
-      vec2 st = uv + warp * texel * 2.2;
+      vec2 st = uv + (vec2(noise(q * 22.0), noise(q * 22.0 + 7.3)) - 0.5) * texel * warp;
 
-      float d = texture2D(dye, st).r;
-      float dx = texture2D(dye, st + vec2(texel.x, 0.0)).r - texture2D(dye, st - vec2(texel.x, 0.0)).r;
-      float dz = texture2D(dye, st + vec2(0.0, texel.y)).r - texture2D(dye, st - vec2(0.0, texel.y)).r;
+      float d = dyeSmooth(st);
+      float dx = texture2D(dye, st + vec2(texel.x * 1.5, 0.0)).r - texture2D(dye, st - vec2(texel.x * 1.5, 0.0)).r;
+      float dz = texture2D(dye, st + vec2(0.0, texel.y * 1.5)).r - texture2D(dye, st - vec2(0.0, texel.y * 1.5)).r;
 
       // Paper tooth: pigment settles unevenly into fine grain.
-      float grain = noise(q * 180.0) * 0.4 + noise(q * 48.0) * 0.6;
+      float paper = noise(q * 180.0) * 0.4 + noise(q * 48.0) * 0.6;
 
       float body = smoothstep(0.01, 0.65, d);
       // Watercolour fringe: pigment gathers where the wash thins out at its edges.
       float fringe = clamp(length(vec2(dx, dz)) * 5.0, 0.0, 1.0) * smoothstep(0.02, 0.25, d);
-      float a = body * (0.78 + 0.22 * grain) * 0.72 + fringe * 0.32;
+      float a = body * (1.0 - 0.22 * grain * (1.0 - paper)) * 0.72 + fringe * 0.32;
 
       // Fade out towards the edges of the tray so it never reads as a rectangle.
       float edge = smoothstep(0.0, 0.08, uv.x) * smoothstep(1.0, 0.9, uv.x) * smoothstep(0.0, 0.12, uv.y) * smoothstep(1.0, 0.88, uv.y);
@@ -948,13 +1026,13 @@ board.geometry = new THREE.BoxGeometry(2 * INK.spanX + 0.3, 0.3, 2 * HALF_Z + 0.
 // ---------- Spheres: the pointer, or controllers in a headset ----------
 
 const spheres = [];
-const sphereState = [0, 1, 2].map(() => ({ active: false, prev: new THREE.Vector3(), vel: new THREE.Vector3(), pos: new THREE.Vector3() }));
-function trackSphere(state, pos, dt) {
+const sphereState = [0, 1, 2, 3, 4].map(() => ({ active: false, prev: new THREE.Vector3(), vel: new THREE.Vector3(), pos: new THREE.Vector3() }));
+function trackSphere(state, pos, dt, radius = INK.sphereRadius) {
   if (state.active && dt > 0) state.vel.subVectors(pos, state.prev).divideScalar(dt).clampLength(0, 6);
   else state.vel.set(0, 0, 0);
   state.prev.copy(pos);
   state.active = true;
-  spheres.push({ x: pos.x, y: pos.y, z: pos.z, vx: state.vel.x, vz: state.vel.z });
+  spheres.push({ x: pos.x, y: pos.y, z: pos.z, vx: state.vel.x, vz: state.vel.z, r: radius });
 }
 
 for (const b of blocks) { b.vel = new THREE.Vector3(); b.prevPos = b.group.position.clone(); }
@@ -980,10 +1058,19 @@ function updateInk(dt, t, inXR) {
   spheres.length = 0;
   if (inXR) {
     controllers.forEach((c, k) => {
-      if (!c.visible) { sphereState[k].active = false; return; }
+      if (!c.visible || c.userData.isHand) { sphereState[k].active = false; return; }
       c.getWorldPosition(sphereState[k].pos);
       model.worldToLocal(sphereState[k].pos);
       trackSphere(sphereState[k], sphereState[k].pos, dt);
+    });
+    // With hand tracking, each index fingertip is the sphere: trail a finger through the ink.
+    hands.forEach((h, k) => {
+      const tip = h.joints && h.joints['index-finger-tip'];
+      const st = sphereState[3 + k];
+      if (!tip || !tip.visible) { st.active = false; return; }
+      tip.getWorldPosition(st.pos);
+      model.worldToLocal(st.pos);
+      trackSphere(st, st.pos, dt, INK.fingerRadius);
     });
   } else if (cursor.active) {
     trackSphere(sphereState[2], cursor.point, dt);

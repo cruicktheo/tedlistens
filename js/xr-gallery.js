@@ -322,6 +322,15 @@ export function createXRGallery({ renderer, stage, model, camera, blocks, contro
     contactGroup.add(contactBoard.group);
 
     root.add(titleBoard.group, aboutBoard.group, contactGroup);
+
+    // A soft spot on each board, from above and in front, leaving a pool of light on the floor.
+    for (const [boardGroup, height] of [[titleBoard.group, 3.0], [aboutBoard.group, 2.7], [contactBoard.group, 2.7]]) {
+      const spot = new THREE.SpotLight(0xffffff, 14, 6, 0.5, 0.7, 2);
+      const front = new THREE.Vector3(0, 0, 1.1).applyEuler(boardGroup.rotation).add(boardGroup.position);
+      spot.position.set(front.x, height, front.z);
+      spot.target.position.set(boardGroup.position.x, 1.2, boardGroup.position.z);
+      root.add(spot, spot.target);
+    }
     solids.push(titleBoard.slab, aboutBoard.slab, contactBoard.slab);
 
     // Tags and role cards for each block.
