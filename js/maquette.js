@@ -493,7 +493,7 @@ for (let i = 0; i < 2; i++) {
   controller.add(beam);
   controller.addEventListener('selectstart', onSelectStart);
   controller.addEventListener('selectend', onSelectEnd);
-  controller.addEventListener('squeezestart', () => { if (renderer.xr.isPresenting) placeStage(); });
+  controller.addEventListener('squeezestart', () => { if (renderer.xr.isPresenting && readHead()) placeStage(); });
   scene.add(controller);
   controllers.push(controller);
 
@@ -534,9 +534,24 @@ const TABLE_DISTANCE = 0.62;   // metres from the eyes to the middle of the tabl
 const TABLE_BELOW_EYES = 0.5;
 let stagePending = false;
 
+// Head pose straight from the headset; the regular camera still holds the desktop view at first.
+const headPos = new THREE.Vector3();
+const headQuat = new THREE.Quaternion();
+function readHead(frame) {
+  if (frame) {
+    const pose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+    if (!pose) return false;
+    const { position: p, orientation: o } = pose.transform;
+    headPos.set(p.x, p.y, p.z);
+    headQuat.set(o.x, o.y, o.z, o.w);
+    return true;
+  }
+  renderer.xr.getCamera().matrixWorld.decompose(headPos, headQuat, new THREE.Vector3());
+  return true;
+}
+
 function placeStage() {
-  const headPos = camera.position;
-  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(headQuat);
   fwd.y = 0;
   if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
   fwd.normalize();
@@ -1004,7 +1019,7 @@ const identity = new THREE.Quaternion();
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 let elapsed = 0;
 
-renderer.setAnimationLoop(() => {
+renderer.setAnimationLoop((time, frame) => {
   const dt = Math.min(clock.getDelta(), 0.05);
   const inXR = renderer.xr.isPresenting;
   if (!heroVisible && !inXR) return;
@@ -1033,7 +1048,7 @@ renderer.setAnimationLoop(() => {
 
   if (inXR) {
     // The head pose arrives a frame or two into the session; place the table once it has.
-    if (stagePending && camera.position.lengthSq() > 0.01) { placeStage(); stagePending = false; }
+    if (stagePending && readHead(frame)) { placeStage(); stagePending = false; }
     gallery.update(dt);
   }
 

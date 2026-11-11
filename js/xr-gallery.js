@@ -427,7 +427,7 @@ export function createXRGallery({ renderer, stage, model, camera, blocks, contro
     if (!built) return;
     // Work in the stage's frame: tags and cards are its children, and it may be turned.
     root.updateMatrixWorld();
-    camera.getWorldPosition(head);
+    head.setFromMatrixPosition(renderer.xr.getCamera().matrixWorld);
     root.worldToLocal(head);
 
     // What each controller points at; beams stop where they hit.
